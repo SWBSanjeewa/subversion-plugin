@@ -85,6 +85,7 @@ public class UserProvidedCredential implements Closeable {
     }
 
     public UserProvidedCredential(String username, String password, File keyFile, AbstractProject inContextOf) {
+    	
         this.username = username;
         this.password = password;
         this.keyFile = keyFile;
@@ -184,9 +185,10 @@ public class UserProvidedCredential implements Closeable {
                 // from OS user name? In any case, we need to return the same user name.
                 // I don't set the cred field here, so that the 1st credential for ssh
                 // won't get clobbered.
+            	
                 return new SVNUserNameAuthentication(username, false);
             if (kind.equals(ISVNAuthenticationManager.PASSWORD)) {
-                logWriter.println("Passing user name " + username + " and password you entered");
+                logWriter.println("Passing user name " + username + " and password you entered:"+password);
                 cred = new PasswordCredential(username, password);
             }
             if (kind.equals(ISVNAuthenticationManager.SSH)) {

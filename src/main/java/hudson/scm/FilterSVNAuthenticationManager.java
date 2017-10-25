@@ -59,7 +59,5 @@ public class FilterSVNAuthenticationManager implements ISVNAuthenticationManager
         return core.getConnectTimeout(repository);
     }
 
-    public void setAuthenticationOutcomeListener(ISVNAuthenticationOutcomeListener listener) {
-        core.setAuthenticationOutcomeListener(listener);
-    }
+   
 }

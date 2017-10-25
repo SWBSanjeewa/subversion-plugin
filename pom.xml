@@ -32,7 +32,7 @@ THE SOFTWARE.
   </parent>
 
   <artifactId>subversion</artifactId>
-  <version>1.54</version>
+  <version>1.54.1-SNAPSHOT</version>
   <packaging>hpi</packaging>
 
   <name>Jenkins Subversion Plug-in</name>
@@ -50,12 +50,10 @@ THE SOFTWARE.
       <id>kohsuke abayer dodok1 dty huybrechts mindless pgweiss stephenconnolly rseguy kutzi etc</id>
     </developer>
   </developers>
-
   <scm>
-    <connection>scm:git:git://github.com/jenkinsci/${project.artifactId}-plugin.git</connection>
-    <developerConnection>scm:git:git@github.com:jenkinsci/${project.artifactId}-plugin.git</developerConnection>
-    <url>http://github.com/jenkinsci/${project.artifactId}-plugin</url>
-    <tag>subversion-1.54</tag>
+    <connection>scm:git:git://github.com/SWBSanjeewa/${project.artifactId}-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:SWBSanjeewa/${project.artifactId}-plugin.git</developerConnection>
+    <url>http://github.com/SWBSanjeewa/${project.artifactId}-plugin</url>
   </scm>
   <distributionManagement>
     <repository>
@@ -91,8 +89,18 @@ THE SOFTWARE.
     <dependency>
       <groupId>org.jenkins-ci.svnkit</groupId>
       <artifactId>svnkit</artifactId>
-      <version>1.7.10-jenkins-1</version>
+      <version>1.8.11</version>
     </dependency>
+     <dependency>
+      <groupId>de.regnis.q.sequence</groupId>
+      <artifactId>sequence-library</artifactId>
+      <version>1.0.3</version>
+    </dependency>
+    <dependency>
+    <groupId>org.tmatesoft.sqljet</groupId>
+    <artifactId>sqljet</artifactId>
+    <version>1.1.10</version>
+</dependency>
     <dependency>
       <groupId>org.jenkins-ci</groupId>
       <artifactId>trilead-ssh2</artifactId>

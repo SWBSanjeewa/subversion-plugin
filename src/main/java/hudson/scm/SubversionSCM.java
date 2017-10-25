@@ -77,6 +77,7 @@ import hudson.util.XStream2;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -97,6 +98,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -135,7 +137,6 @@ import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNNodeKind;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
-import org.tmatesoft.svn.core.auth.ISVNAuthenticationOutcomeListener;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationProvider;
 import org.tmatesoft.svn.core.auth.SVNAuthentication;
 import org.tmatesoft.svn.core.auth.SVNPasswordAuthentication;
@@ -974,7 +975,7 @@ public class SubversionSCM extends SCM implements Serializable {
         else
             configDir = SVNWCUtil.getDefaultConfigurationDirectory();
         
-        ISVNAuthenticationManager sam = SVNWCUtil.createDefaultAuthenticationManager(configDir, null, null);
+        ISVNAuthenticationManager sam = new SVNAuthenticationManager(configDir, null, null);
         sam.setAuthenticationProvider(authProvider);
         SVNAuthStoreHandlerImpl.install(sam);
         return sam;
@@ -1508,23 +1509,30 @@ public class SubversionSCM extends SCM implements Serializable {
              */
             private static final long serialVersionUID = -1676145651108866745L;
             private final String userName;
-            private final Secret password; // for historical reasons, scrambled by base64 in addition to using 'Secret'
+            private final String password; // for historical reasons, scrambled by base64 in addition to using 'Secret'
 
             public PasswordCredential(String userName, String password) {
                 this.userName = userName;
-                this.password = Secret.fromString(Scrambler.scramble(password));
+                this.password = password;
+                //this.password = Secret.fromString(Scrambler.scramble(password));
+                
             }
 
             @Override
             public SVNAuthentication createSVNAuthentication(String kind) {
-                if(kind.equals(ISVNAuthenticationManager.SSH))
+                if(kind.equals(ISVNAuthenticationManager.SSH)){
+                	
                     return new SVNSSHAuthentication(userName, getPassword(),-1,false);
-                else
+                }else{
                     return new SVNPasswordAuthentication(userName, getPassword(),false);
+                }
             }
 
             private String getPassword() {
-                return Scrambler.descramble(Secret.toString(password));
+            	//System.out.println("Secretpassword:"+Secret.toString(password));
+            	//System.out.println("Secretpassword22:"+Scrambler.descramble(Secret.toString(password)));
+                //return Scrambler.descramble(Secret.toString(password));
+            	return password;
             }
         }
 
@@ -1559,8 +1567,9 @@ public class SubversionSCM extends SCM implements Serializable {
                     FileUtils.copyFile(keyFile,savedKeyFile);
                     setFilePermissions(savedKeyFile, "600");
                 } catch (IOException e) {
-                    throw new SVNException(
-                            SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE,"Unable to save private key").initCause(e));
+                   // throw new SVNException(
+                   //         SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE,"Unable to save private key").initCause(e));
+                    LOGGER.log(Level.FINE, "Unable to save private key", e);
                 }
             }
 
@@ -1619,15 +1628,21 @@ public class SubversionSCM extends SCM implements Serializable {
                         }
                         return new SVNSSHAuthentication(userName, privateKey.toCharArray(), Scrambler.descramble(Secret.toString(passphrase)),-1,false);
                     } catch (IOException e) {
-                        throw new SVNException(
-                                SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE,"Unable to load private key").initCause(e));
+                       // throw new SVNException(
+                        //         SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE,"Unable to save private key").initCause(e));
+                         LOGGER.log(Level.FINE, "Unable to load private key", e);
+                    
                     } catch (InterruptedException e) {
-                        throw new SVNException(
-                                SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE,"Unable to load private key").initCause(e));
+                        //throw new SVNException(
+                        //        SVNErrorMessage.create(SVNErrorCode.AUTHN_CREDS_UNAVAILABLE,"Unable to load private key").initCause(e));
+                        LOGGER.log(Level.FINE, "Unable to load private key", e);
                     }
-                } else
+                } else{
                     return null; // unknown
+                }
+                return null; // unknown
             }
+           
         }
 
         /**
@@ -1649,7 +1664,7 @@ public class SubversionSCM extends SCM implements Serializable {
             @Override
             public SVNAuthentication createSVNAuthentication(String kind) {
                 if(kind.equals(ISVNAuthenticationManager.SSL))
-                    try {
+                    /*try {
                         SVNSSLAuthentication authentication = new SVNSSLAuthentication(
                                 Base64.decode(certificate.getPlainText().toCharArray()),
                                 Scrambler.descramble(Secret.toString(password)), false);
@@ -1657,7 +1672,18 @@ public class SubversionSCM extends SCM implements Serializable {
                         return authentication;
                     } catch (IOException e) {
                         throw new Error(e); // can't happen
-                    }
+                    }*/
+                	try {
+                        return SVNSSLAuthentication.newInstance(
+                          Base64.decode(this.certificate
+                          .getPlainText().toCharArray()), 
+                          Scrambler.descramble(Secret.toString(this.password))
+                          .toCharArray(), false, null, false);
+                      }
+                      catch (IOException e)
+                      {
+                        throw new Error(e);
+                      }
                 else
                     return null; // unexpected authentication type
             }
@@ -1697,8 +1723,34 @@ public class SubversionSCM extends SCM implements Serializable {
                     }
                 }
                 LOGGER.fine(String.format("getCredential(%s)=>%s",realm,credentials.get(realm)));
-                return credentials.get(realm);
+               
+                Credential c =  credentials.get(realm);
+                if(c==null){
+
+                	Properties props = new Properties();
+                	File f = new File(Hudson.getInstance().getRootDir(),"hudson.scm.SubversionSCM.properties");
+                	try {
+                		
+                		props.load(new FileReader(f));
+            			String realmKey = realm.substring(realm.indexOf("//")+2,realm.lastIndexOf(":"));
+						String userName = (String)props.get(realmKey+"_userName");
+						String password = (String)props.get(realmKey+"_password");
+						LOGGER.fine("userName >>"+userName);
+						LOGGER.fine("password >>"+password);
+						return new PasswordCredential(userName,new String(Base64.decode(password.toCharArray())));
+                	} catch (FileNotFoundException e) {
+                		LOGGER.info("Could not read property file "+f.getAbsolutePath());
+					} catch (IOException e) {
+						LOGGER.info("Could not read property file "+f.getAbsolutePath());
+					}
+                	
+                	
+                }
+                
+                return c;
             }
+            
+            
 
             public void acknowledgeAuthentication(String realm, Credential credential) {
                 // this notification is only used on the project-local store.
@@ -1715,7 +1767,7 @@ public class SubversionSCM extends SCM implements Serializable {
         /**
          * See {@link DescriptorImpl#createAuthenticationProvider(AbstractProject)}.
          */
-        static final class SVNAuthenticationProviderImpl implements ISVNAuthenticationProvider, ISVNAuthenticationOutcomeListener, Serializable {
+        static final class SVNAuthenticationProviderImpl implements ISVNAuthenticationProvider, Serializable {
             /**
              * Project-scoped authentication source. For historical reasons, can be null.
              */
@@ -1737,11 +1789,12 @@ public class SubversionSCM extends SCM implements Serializable {
             }
 
             private SVNAuthentication fromProvider(SVNURL url, String realm, String kind, RemotableSVNAuthenticationProvider src, String debugName) throws SVNException {
-                if (src==null)  return null;
-                
+            	if (src==null)  return null;
                 Credential cred = src.getCredential(url,realm);
+               
                 LOGGER.fine(String.format("%s.requestClientAuthentication(%s,%s,%s)=>%s",debugName,kind,url,realm,cred));
                 this.lastCredential = cred;
+               
                 if(cred!=null)  return cred.createSVNAuthentication(kind);
                 return null;
             }
@@ -1778,10 +1831,10 @@ public class SubversionSCM extends SCM implements Serializable {
                 }
             }
 
-            public void acknowledgeAuthentication(boolean accepted, String kind, String realm, SVNErrorMessage errorMessage, SVNAuthentication authentication) throws SVNException {
+            /*public void acknowledgeAuthentication(boolean accepted, String kind, String realm, SVNErrorMessage errorMessage, SVNAuthentication authentication) throws SVNException {
                 if (accepted && local!=null && lastCredential!=null)
                     local.acknowledgeAuthentication(realm,lastCredential);
-            }
+            }*/
 
             public int acceptServerAuthentication(SVNURL url, String realm, Object certificate, boolean resultMayBeStored) {
                 return ACCEPTED_TEMPORARY;
